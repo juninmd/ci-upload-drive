@@ -4,15 +4,15 @@ const path = require('path');
 const { google } = require('googleapis');
 const scopes = ['https://www.googleapis.com/auth/drive'];
 
-if(!process.env.CLIENT_EMAIL){
+if (!process.env.CLIENT_EMAIL) {
   throw new Error('Missing env: CLIENT_EMAIL');
 }
 
-if(!process.env.PRIVATE_KEY){
+if (!process.env.PRIVATE_KEY) {
   throw new Error('Missing env: PRIVATE_KEY');
 }
 
-if(!process.env.FOLDER_ID){
+if (!process.env.FOLDER_ID) {
   throw new Error('Missing env: FOLDER_ID');
 }
 
@@ -33,12 +33,12 @@ if (!fs.existsSync(pathFile)) {
 }
 
 const pathPermissions = path.resolve(process.argv[3]);
-if (!fs.existsSync(pathFile)) {
+if (!fs.existsSync(pathPermissions)) {
   console.error(`Permission not found: ${pathFile}`);
   return;
 }
 
-const permissions = fs.readFileSync(pathPermissions);
+const permissions = JSON.parse(fs.readFileSync(pathPermissions).toString());
 
 const name = path.basename(pathFile);
 upload(name, pathFile);
@@ -50,9 +50,10 @@ async function upload(name, pathFile) {
     parents: [folderId]
   };
 
-  const file = fs.createReadStream(pathFile);
-
   try {
+
+    const file = fs.createReadStream(pathFile);
+
     const fileCreated = await drive.files.create({
       resource: fileMetadata,
       media: {
@@ -69,7 +70,8 @@ async function upload(name, pathFile) {
         fields: 'id',
       });
     }
+    console.info('Google Drive file uploaded with success');
   } catch (error) {
-    console.log(error);
+    console.log(error.toString());
   }
 }
