@@ -16,10 +16,12 @@ if (!process.env.FOLDER_ID) {
   throw new Error('Missing env: FOLDER_ID');
 }
 
+const privateKey = process.env.PRIVATE_KEY.toString().replace(/\\n/g, '\n');;
+
 const auth = new google.auth.JWT(
   process.env.CLIENT_EMAIL,
   null,
-  process.env.PRIVATE_KEY,
+  privateKey,
   scopes
 );
 
