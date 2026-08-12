@@ -1,17 +1,61 @@
 {
   "name": "ci-upload-drive",
   "version": "1.0.3",
-  "description": "",
+  "description": "Upload build artifacts to Google Drive from CI and share them with custom permissions.",
   "preferGlobal": true,
   "bin": {
     "ci-upload-drive": "index.js"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "lint": "eslint .",
+    "format": "prettier --write \"**/*.{js,json,md}\"",
+    "format:check": "prettier --check \"**/*.{js,json,md}\"",
+    "typecheck": "tsc --noEmit -p jsconfig.json",
+    "audit": "npm audit --audit-level=high",
+    "test": "jest --runInBand",
+    "test:coverage": "jest --runInBand --coverage",
+    "test:ci": "jest --ci --runInBand --coverage",
+    "build": "npm run lint && npm run typecheck && npm run test:ci"
   },
+  "keywords": [
+    "google-drive",
+    "upload",
+    "ci",
+    "cli",
+    "devops"
+  ],
   "author": "",
   "license": "ISC",
+  "engines": {
+    "node": ">=14"
+  },
   "dependencies": {
     "googleapis": "^48.0.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "@types/jest": "^29.5.0",
+    "@types/node": "^20.0.0",
+    "eslint": "^9.0.0",
+    "eslint-config-prettier": "^9.0.0",
+    "globals": "^15.0.0",
+    "jest": "^29.7.0",
+    "prettier": "^3.0.0",
+    "typescript": "^5.0.0"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "collectCoverageFrom": [
+      "index.js",
+      "src/**/*.js"
+    ],
+    "coverageThreshold": {
+      "global": {
+        "branches": 80,
+        "functions": 80,
+        "lines": 80,
+        "statements": 80
+      }
+    }
   }
 }
