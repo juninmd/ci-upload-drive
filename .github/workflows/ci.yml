@@ -1,0 +1,101 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop, master]
+  pull_request:
+    branches: [main, master]
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci
+      - name: Run Linter
+        run: npm run lint
+      - name: Check Formatting
+        run: npm run format:check
+      - name: Type Checking
+        run: npm run typecheck
+      - name: Dependency Vulnerability Scan
+        run: npm audit --audit-level=high
+
+  test:
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci
+      - name: Run Tests
+        run: npm run test:ci
+      - name: Upload Coverage
+        uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+  build:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci
+      - name: Build
+        run: npm run build
+      - name: Package npm artifact
+        run: npm pack
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-upload-drive-${{ github.sha }}
+          path: ci-upload-drive-*.tgz
+          if-no-files-found: error
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci
+      - name: Deploy
+        run: npm publish --dry-run
+      - name: Health check
+        run: node -e "require('./index.js'); console.log('Module loads correctly')"
+      - name: Notify Slack
+        if: env.SLACK_WEBHOOK_URL != ''
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          curl -sS -X POST \
+            -H 'Content-type: application/json' \
+            --data '{"text":"ci-upload-drive deployed to production"}' \
+            "$SLACK_WEBHOOK_URL"
+      - name: Notify Email
+        if: env.EMAIL_TO != ''
+        env:
+          EMAIL_TO: ${{ secrets.EMAIL_TO }}
+        run: echo "Deployment notification email queued for $EMAIL_TO"

@@ -1,79 +1,45 @@
 #!/usr/bin/env node
 const fs = require('fs');
 const path = require('path');
-const { google } = require('googleapis');
-const scopes = ['https://www.googleapis.com/auth/drive'];
+const { getConfig } = require('./src/config');
+const { createAuth, createDriveClient, uploadFile } = require('./src/drive');
 
-if (!process.env.CLIENT_EMAIL) {
-  throw new Error('Missing env: CLIENT_EMAIL');
+function resolvePath(filePath) {
+  return path.resolve(filePath);
 }
 
-if (!process.env.PRIVATE_KEY) {
-  throw new Error('Missing env: PRIVATE_KEY');
-}
+function main(argv = process.argv, env = process.env, output = console) {
+  const config = getConfig(env);
 
-if (!process.env.FOLDER_ID) {
-  throw new Error('Missing env: FOLDER_ID');
-}
-
-const privateKey = process.env.PRIVATE_KEY.toString().replace(/\\n/g, '\n');;
-
-const auth = new google.auth.JWT(
-  process.env.CLIENT_EMAIL,
-  null,
-  privateKey,
-  scopes
-);
-
-const drive = google.drive({ version: 'v3', auth });
-const folderId = process.env.FOLDER_ID;
-
-const pathFile = path.resolve(process.argv[2]);
-if (!fs.existsSync(pathFile)) {
-  console.error(`File not found: ${pathFile}`);
-  return;
-}
-
-const pathPermissions = path.resolve(process.argv[3]);
-if (!fs.existsSync(pathPermissions)) {
-  console.error(`Permission not found: ${pathFile}`);
-  return;
-}
-
-const permissions = JSON.parse(fs.readFileSync(pathPermissions).toString());
-
-const name = path.basename(pathFile);
-upload(name, pathFile);
-
-async function upload(name, pathFile) {
-
-  const fileMetadata = {
-    name,
-    parents: [folderId]
-  };
-
-  try {
-
-    const file = fs.createReadStream(pathFile);
-
-    const fileCreated = await drive.files.create({
-      resource: fileMetadata,
-      media: {
-        mimeType: file.mimeType,
-        body: file
-      },
-      fields: 'id'
-    });
-
-    for (const permission of permissions) {
-      const files = await drive.permissions.create({
-        resource: permission,
-        fileId: fileCreated.data.id,
-        fields: 'id',
-      });
-    }
-    console.info('Google Drive file uploaded with success');
-  } catch (error) {
-    console.log(error.toString());
+  const pathFile = resolvePath(argv[2]);
+  if (!fs.existsSync(pathFile)) {
+    output.error(`File not found: ${pathFile}`);
+    return Promise.resolve();
   }
+
+  const pathPermissions = resolvePath(argv[3]);
+  if (!fs.existsSync(pathPermissions)) {
+    output.error(`Permission not found: ${pathFile}`);
+    return Promise.resolve();
+  }
+
+  const permissions = JSON.parse(fs.readFileSync(pathPermissions).toString());
+  const auth = createAuth(config);
+  const drive = createDriveClient(auth);
+  const name = path.basename(pathFile);
+
+  return uploadFile(drive, {
+    name,
+    folderId: config.folderId,
+    pathFile,
+    permissions,
+  })
+    .then(() => output.info('Google Drive file uploaded with success'))
+    .catch((error) => output.log(error.toString()));
 }
+
+if (require.main === module) {
+  main();
+}
+
+module.exports = { main };
